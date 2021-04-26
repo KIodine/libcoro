@@ -35,5 +35,11 @@ coro_switch:
 .global coro_stack_ret
 coro_stack_ret:
     and rsp, 0xfffffffffffffff0    # force align 16-byte boundary
+#if defined(__pic__) || defined(__PIC__)
+    call coro_ret_warn@PLT
+    call abort@PLT
+#else
     call coro_ret_warn
     call abort
+#endif
+    ret     # should be unreachable

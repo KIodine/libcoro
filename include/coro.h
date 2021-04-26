@@ -32,10 +32,15 @@ typedef struct {
     size_t valid_sz; /* The real size of stack that is utilized by coroutine. */
     struct {
         /* Anonymous struct for storing statistical data. */
+        size_t n_saved;
+        size_t n_restored;
         size_t n_resumed;
     } stat;
 } coro_mem_t;
 
+/* PROPOSAL
+- Add stat: maximum stack usage, co run number?
+*/
 typedef struct {
     void *raw_ptr; /* The base address of allocated space. */
     size_t raw_sz; /* The size of allocated memory, including protected page, if such presents. */
@@ -44,12 +49,15 @@ typedef struct {
     size_t align_limit; /* The maximum size the stack is allowed to use. */
     void *ret_addr_ptr; /* the address of IP on the stack. */
     coro_t *last_owner; /* last coroutine using the shared stack. */
+    struct {
+        size_t max_stack_usage;
+    } stat;
     /* --- flags --- */
     int is_guard_page_enabled;
 } coro_stack_t;
 
 struct coro_s {
-    void *reg[9];
+    void *reg[9];   /* !do not move this member, it is used by assembly code! */
     coro_stack_t *stack;
     coro_mem_t mem;
     coro_fp_t func;
@@ -61,8 +69,17 @@ struct coro_s {
 
 
 /* The variable for thread local currently running coroutine. */
-/*
+/* TODO:
+- Custom check macros.
+- Wrap access to global variable into `coro_*` function.
+- Rearrange struct layout.
+- Add shortcuts for certain operations, such as allocating a main coro.
+- (PROPOSAL)Add statistic fields to structs.
+- Add more checks, assertions.
+- Test abort mechanism and test stack overflow.
+- (STUDY) The possibility of return from triggered raw-return protection.
 */
+
 extern __thread coro_t *tls_co;
 extern __thread coro_fp_t tls_ret_warn;
 void coro_ret_warn(void); /* may call default warning or `tls ret_warn`. */
@@ -77,11 +94,14 @@ coro_t *coro_new(
 );
 void coro_free(coro_t *co);
 
+#define coro_new_main() coro_new(NULL, NULL, NULL, 0, NULL)
+
 extern void coro_switch(coro_t *from, coro_t *to) __asm__("coro_switch");
 
 void coro_resume(coro_t *co);
 void coro_reset(coro_t *co);
 
+/* ensure pointer is not NULL? */
 #define coro_yield() do { \
     coro_switch(tls_co, tls_co->from_co);\
 } while (0)
@@ -92,9 +112,11 @@ void coro_reset(coro_t *co);
     coro_yield();\
 } while (0)
 
-/*
-void coro_yield(void);
-void coro_return(void);
-*/
+/* How to prevent this being a left value? */
+#define coro_get_co() ((void)0, (tls_co))
+#define coro_get_arg() ((void)0, (tls_co->arg))
+
+#define coro_is_main(co) ((co)->from_co == NULL)
+
 
 #endif /* CORO_H */

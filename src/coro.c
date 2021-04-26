@@ -1,4 +1,6 @@
+#define _GNU_SOURCE
 #include <assert.h>
+#include <stdio.h>
 
 #include "coro.h"
 
@@ -11,9 +13,11 @@ __thread coro_fp_t tls_ret_warn = NULL;
 
 // static default_ret_warn(void){...}
 
-void coro_ret_warn(void){
+void coro_ret_warn(void)
+{
     /* FIXME: decide how to handle use of raw return in coroutine. */
     printf("Current coroutine: %p\n", tls_co);
+    /* call `tls_ret_warn` or `default_ret_warn` */
     return;
 }
 
@@ -76,7 +80,9 @@ coro_stack_t *coro_stack_new(size_t sz_hint, int enable_guard_page)
     sstack->align_top = (void*)(
         (((uintptr_t)stack_addr + stack_sz) & ~(0xf)) - sizeof(uintptr_t)*2
     );
-    sstack->align_limit =  sstack->align_top - aligned_ptr + sizeof(uintptr_t)*2;
+    /*  `align_limit` includes pointer `aligned_top`, range:
+        [`aligned_ptr`, `aligned_top`], 16-byte aligned. */
+    sstack->align_limit  = sstack->align_top - aligned_ptr + sizeof(uintptr_t)*2;
     sstack->ret_addr_ptr = sstack->align_top + sizeof(uintptr_t);
     /*  put a function at the bottom of stack, a "normal" return will
         trigger this function. */
@@ -141,34 +147,39 @@ void coro_reset(coro_t *co)
     return;
 }
 
-/* TODO: co_resume */
 void coro_resume(coro_t *co)
 {
     size_t stack_use = 0;
     coro_stack_t *sstack = co->stack;
+    coro_mem_t *mem = NULL;
     coro_t *own_co = NULL;
-/*
-    save current stack to the last owner, if necessary.
-    put contents of save stack to shared stack.
-    set current co.
-    do switch registers.
-*/
+
+    /* PROPOSAL: Die if try to resume main co or an ended co? */
+    
     if (sstack->last_owner == co)
     {
-        /* skip saving process. */
+        /* no need to swap stack content, skip saving process. */
         goto do_switch;
     }
     /* do preserve to private mem. */
     if (sstack->last_owner != NULL)
     {
-        coro_mem_t *mem = &(own_co->mem);
-        own_co    = sstack->last_owner;
+        own_co  = sstack->last_owner;
+        mem     = &(own_co->mem);
+
+        /* TODO: update max stack usage on saving coro. */
+
         /* Include `sp`, but not `ret_addr_ptr` */
-        // check stack overflow?
         stack_use = sstack->ret_addr_ptr - own_co->reg[REG_IDX_SP];
+        // check stack overflow
+        assert(
+            sstack->align_top - (sstack->align_limit - sizeof(uintptr_t)*2)
+            <=
+            own_co->reg[REG_IDX_SP]
+        );
+        /*  Stack usage may vary according to the depth of calls of 
+            the last owner. */
         if (own_co->mem.raw_sz < stack_use){
-            /*  Stack usage may vary according to the depth of calls of 
-                the last owner. */
             for(;;){
                 /*  double the size of private stack until it is suitable
                     for storage. */
@@ -179,25 +190,37 @@ void coro_resume(coro_t *co)
             }
             free(mem->raw_ptr);
             mem->raw_ptr = malloc(mem->raw_sz);
-            memset(own_co->mem.raw_ptr, 0, mem->raw_sz);
+            memset(mem->raw_ptr, 0, mem->raw_sz);
         }
         memcpy(mem->raw_ptr, own_co->reg[REG_IDX_SP], stack_use);
+        /* update size of new content. */
         own_co->mem.valid_sz = stack_use;
+        // update `n_saved`
         sstack->last_owner = NULL;
     }
-    /* put stuffs from private mem to shared stack. */
+    /* restore stuffs from private mem to shared stack. */
     if (co->mem.valid_sz > 0){
         /* if it is not the first time coroutine resumes. */
         void *cpy_base = (void*)(
             (uintptr_t)sstack->ret_addr_ptr - (uintptr_t)co->mem.valid_sz
         );
-        memcpy(cpy_base, co->reg[REG_IDX_SP], co->mem.valid_sz);
+        memcpy(cpy_base, co->mem.raw_ptr, co->mem.valid_sz);
+        // update `n_restored`
     }
+    sstack->last_owner = co;
 
 do_switch:
+    // update `n_resumed`?
     tls_co = co;
     coro_switch(co->from_co, co);
     tls_co = co->from_co;
     
+    /*  calculate max stack usage here, so we can record the stack usage of
+        a one-time coroutine. */
+    stack_use = sstack->ret_addr_ptr - co->reg[REG_IDX_SP];
+    if (stack_use > sstack->stat.max_stack_usage){
+        sstack->stat.max_stack_usage = stack_use;
+    }
+
     return;
 }
