@@ -3,11 +3,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #if defined (__x86_64__)
 #else
@@ -26,6 +21,7 @@ typedef struct coro_s coro_t;
 
 typedef void (*coro_fp_t)(void);
 
+
 typedef struct {
     void *raw_ptr; /* The base address of allocated memory. */
     size_t raw_sz; /* The size of allocated memory. */
@@ -38,14 +34,12 @@ typedef struct {
     } stat;
 } coro_mem_t;
 
-/* PROPOSAL
-- Add stat: maximum stack usage, co run number?
-*/
+
 typedef struct {
     void *raw_ptr; /* The base address of allocated space. */
     size_t raw_sz; /* The size of allocated memory, including protected page, if such presents. */
     void *align_top; /* Address of stack "bottom", 16-byte aligned. */
-    size_t valid_sz; /* The size of stack being used. */
+    //size_t valid_sz; /* The size of stack being used. */
     size_t align_limit; /* The maximum size the stack is allowed to use. */
     void *ret_addr_ptr; /* the address of IP on the stack. */
     coro_t *last_owner; /* last coroutine using the shared stack. */
@@ -55,6 +49,7 @@ typedef struct {
     /* --- flags --- */
     int is_guard_page_enabled;
 } coro_stack_t;
+
 
 struct coro_s {
     void *reg[9];   /* !do not move this member, it is used by assembly code! */
