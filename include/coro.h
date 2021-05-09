@@ -28,9 +28,7 @@ typedef struct {
     size_t valid_sz; /* The real size of stack that is utilized by coroutine. */
     struct {
         /* Anonymous struct for storing statistical data. */
-        size_t n_saved;
-        size_t n_restored;
-        size_t n_resumed;
+        size_t max_mem_usage;
     } stat;
 } coro_mem_t;
 
@@ -75,9 +73,12 @@ struct coro_s {
 - (STUDY) The possibility of return from triggered raw-return protection.
 */
 
-extern __thread coro_t *tls_co;
-extern __thread coro_fp_t tls_ret_warn;
-void coro_ret_warn(void); /* may call default warning or `tls ret_warn`. */
+extern __thread coro_t *coro_tls_co;
+extern __thread coro_fp_t coro_tls_ret_warn;
+
+#define coro_set_ret_warn(fp) ((void)0, coro_tls_ret_warn = (fp))
+
+//void coro_ret_warn(void); /* may call default warning or `coro_tls_ret_warn`. */
 extern void coro_stack_ret(void) __asm__("coro_stack_ret");
 
 coro_stack_t *coro_stack_new(size_t sz_hint, int enable_guard_page);
@@ -89,6 +90,7 @@ coro_t *coro_new(
 );
 void coro_free(coro_t *co);
 
+#define coro_stack_new_guarded(sz_hint) coro_stack_new((sz_hint), 1)
 #define coro_new_main() coro_new(NULL, NULL, NULL, 0, NULL)
 
 extern void coro_switch(coro_t *from, coro_t *to) __asm__("coro_switch");
@@ -98,18 +100,18 @@ void coro_reset(coro_t *co);
 
 /* ensure pointer is not NULL? */
 #define coro_yield() do { \
-    coro_switch(tls_co, tls_co->from_co);\
+    coro_switch(coro_tls_co, coro_tls_co->from_co);\
 } while (0)
 
 #define coro_return() do { \
-    tls_co->is_ended = 1;\
-    tls_co->stack->last_owner = NULL;\
+    coro_tls_co->is_ended = 1;\
+    coro_tls_co->stack->last_owner = NULL;\
     coro_yield();\
 } while (0)
 
 /* How to prevent this being a left value? */
-#define coro_get_co() ((void)0, (tls_co))
-#define coro_get_arg() ((void)0, (tls_co->arg))
+#define coro_get_co() ((void)0, (coro_tls_co))
+#define coro_get_arg() ((void)0, (coro_tls_co->arg))
 
 #define coro_is_main(co) ((co)->from_co == NULL)
 

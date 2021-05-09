@@ -11,17 +11,31 @@
 
 //static void default_ret_warn(void);
 
-__thread coro_t *tls_co = NULL;
-__thread coro_fp_t tls_ret_warn = NULL;
+__thread coro_t *coro_tls_co = NULL;
+__thread coro_fp_t coro_tls_ret_warn = NULL;
 
 
-// static default_ret_warn(void){...}
+static void default_ret_warn(void){
+    fprintf(stderr,
+        ("You've triggered return protection due to raw return in "
+        "coroutine.\n")
+    );
+    fprintf(stderr,
+        "Current coroutine: %p, arg: %p\n", coro_get_co(), coro_get_arg()
+    );
+    return;
+}
 
 void coro_ret_warn(void)
 {
     /* FIXME: decide how to handle use of raw return in coroutine. */
-    printf("Current coroutine: %p\n", tls_co);
-    /* call `tls_ret_warn` or `default_ret_warn` */
+    printf("Current coroutine: %p\n", coro_tls_co);
+    if (coro_tls_ret_warn != NULL){
+        coro_tls_ret_warn();
+    } else {
+        default_ret_warn();
+    }
+    /* call `coro_tls_ret_warn` or `default_ret_warn` */
     return;
 }
 
@@ -159,6 +173,10 @@ void coro_resume(coro_t *co)
     coro_t *own_co = NULL;
 
     /* PROPOSAL: Die if try to resume main co or an ended co? */
+    if (coro_is_main(co) != 0){
+        fprintf(stderr, "Attempted to resume a main co: %p\n", co);
+        abort();
+    }
     
     if (sstack->last_owner == co)
     {
@@ -199,6 +217,9 @@ void coro_resume(coro_t *co)
         memcpy(mem->raw_ptr, own_co->reg[REG_IDX_SP], stack_use);
         /* update size of new content. */
         own_co->mem.valid_sz = stack_use;
+        if (stack_use > own_co->mem.stat.max_mem_usage){
+            own_co->mem.stat.max_mem_usage = stack_use;
+        }
         // update `n_saved`
         sstack->last_owner = NULL;
     }
@@ -215,9 +236,9 @@ void coro_resume(coro_t *co)
 
 do_switch:
     // update `n_resumed`?
-    tls_co = co;
+    coro_tls_co = co;
     coro_switch(co->from_co, co);
-    tls_co = co->from_co;
+    coro_tls_co = co->from_co;
     
     /*  calculate max stack usage here, so we can record the stack usage of
         a one-time coroutine. */

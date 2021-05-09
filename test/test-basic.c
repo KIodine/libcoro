@@ -62,7 +62,7 @@ int main(void)
         }
         printf("count: %d\n", count);
     }
-    assert(tls_co == main_co);
+
     printf("run co_b\n");
     for (;;){
         coro_resume(co_b);
@@ -71,7 +71,7 @@ int main(void)
         }
         printf("count: %d\n", count);
     }
-    assert(tls_co == main_co);
+
     coro_reset(co_a);
     printf("run reset a\n");
     for (;;){
@@ -81,7 +81,7 @@ int main(void)
         }
         printf("count: %d\n", count);
     }
-    assert(tls_co == main_co);
+
 
     printf("max stack use: %lu\n", sstack->stat.max_stack_usage);
 

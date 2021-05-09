@@ -72,6 +72,21 @@ testbin: $(BINDIR)/$(TESTBIN)
 runtest: $(BINDIR)/$(TESTBIN)
 	./$(BINDIR)/$(TESTBIN)
 
+# TODO: Study how to build multiple tests.
+_TESTBIN := test-basic test-arr test-sched
+_TESTBIN := $(addprefix ./bin/,$(_TESTBIN))
+$(_TESTBIN): $(BINDIR)/%: test/%.c $(LIBSTATIC)
+	$(CC) -o $@ $(CFLAGS) $^
+buildtests: $(_TESTBIN)
+
+#TESTSRC := test-basic.c test-arr.c test-sched.c
+#$(BINDIR)/test-basic: $(LIBSTATIC)
+#	$(CC) -o $@ $(CFLAGS) test/test-basic.c $(LIBSTATIC)
+#$(BINDIR)/test-arr: $(LIBSTATIC)
+#	$(CC) -o $@ $(CFLAGS) test/test-arr.c $(LIBSTATIC)
+#$(BINDIR)/test-sched: $(LIBSTATIC)
+#	$(CC) -o $@ $(CFLAGS) test/test-sched.c $(LIBSTATIC)
+
 # --- generic tools ---
 clean:
 	rm -f $(LIBOBJS) $(TESTOBJ)
