@@ -89,7 +89,7 @@ buildtests: $(_TESTBIN)
 
 # --- generic tools ---
 clean:
-	rm -f $(LIBOBJS) $(TESTOBJ)
+	rm -f $(LIBOBJS) $(TESTOBJ) $(TESTBIN) $(_TESTBIN)
 
 # --- DO NOT MODIFY MANUALLY! ---
 # > To update, use make command below:
@@ -99,4 +99,6 @@ depends:
 # --- machine generated ---
 coro.o: src/coro.c include/coro.h
 coro_s.o: src/coro_s.S
+test-arr.o: test/test-arr.c include/coro.h
 test-basic.o: test/test-basic.c include/coro.h
+test-sched.o: test/test-sched.c include/coro.h include/list.h

@@ -13,7 +13,8 @@
 enum {
     REG_IDX_SP = 1,
     REG_IDX_BP = 2,
-    REG_IDX_IP = 3,    
+    REG_IDX_IP = 3,
+    REG_IDX_FPMX = 8,
 };
 
 
@@ -76,7 +77,9 @@ struct coro_s {
 extern __thread coro_t *coro_tls_co;
 extern __thread coro_fp_t coro_tls_ret_warn;
 
-#define coro_set_ret_warn(fp) ((void)0, coro_tls_ret_warn = (fp))
+void coro_thread_init(coro_fp_t ret_cb);
+#define coro_thread_env_save() coro_thread_init(NULL)
+//#define coro_set_ret_warn(fp) ((void)0, coro_tls_ret_warn = (fp))
 
 //void coro_ret_warn(void); /* may call default warning or `coro_tls_ret_warn`. */
 extern void coro_stack_ret(void) __asm__("coro_stack_ret");

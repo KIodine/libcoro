@@ -36,7 +36,9 @@ int main(void)
     coro_stack_t *sstack;
     coro_t *main_co, *co_a, *co_b;
     
-    sstack = coro_stack_new(0, 1);
+    coro_thread_env_save();
+
+    sstack = coro_stack_new_guarded(0);
     
     main_co = coro_new_main();
     co_a = coro_new(work, (void*)&count, main_co, 128, sstack);

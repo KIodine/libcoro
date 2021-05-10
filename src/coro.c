@@ -13,7 +13,17 @@
 
 __thread coro_t *coro_tls_co = NULL;
 __thread coro_fp_t coro_tls_ret_warn = NULL;
+__thread void *coro_tls_fpmx = NULL;
+_Static_assert(sizeof(coro_tls_fpmx) == 8UL, "Assert size of `coro_tls_fpmx` is 8 failed\n");
 
+extern void coro_save_fpmx(void**) __asm__("coro_save_fpmx");
+
+
+void coro_thread_init(coro_fp_t ret_cb){
+    coro_tls_ret_warn = ret_cb;
+    coro_save_fpmx(&coro_tls_fpmx);
+    return;
+}
 
 static void default_ret_warn(void){
     fprintf(stderr,
@@ -131,6 +141,7 @@ coro_t *coro_new(
         /* setup necessary registers. */
         co->reg[REG_IDX_IP] = (void*)fp;
         co->reg[REG_IDX_SP] = sstack->ret_addr_ptr;
+        co->reg[REG_IDX_FPMX] = coro_tls_fpmx;
         if (sz_hint == 0){
             sz_hint = 128;
         }

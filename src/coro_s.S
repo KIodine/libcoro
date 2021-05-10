@@ -30,6 +30,13 @@ coro_switch:
     mov rsp, rcx
     jmp rax
 
+.global coro_save_fpmx
+# param: rdi: (sizeof(any_t) == 8)
+coro_save_fpmx:
+    fnstcw  WORD  PTR [rdi+0x0]
+    stmxcsr DWORD PTR [rdi+0x4]
+    ret
+
 .extern coro_ret_warn
 .extern abort
 .global coro_stack_ret
