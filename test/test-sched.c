@@ -49,7 +49,9 @@ int main(void)
     coro_t *main_co = NULL;
     list_decl(head);
 
-    sstack = coro_stack_new(0, 1);
+    coro_thread_env_save();
+
+    sstack = coro_stack_new_guarded(0);
     main_co = coro_new_main();
 
     task_t *tmp_tsk;
@@ -68,9 +70,11 @@ int main(void)
 
         coro_resume(cur_co);
         if (cur_co->is_ended != 0){
+            // destroy task.
             coro_free(tmp_tsk->coro);
             free(tmp_tsk);
         } else {
+            // re-schedule.
             list_push(&head, &tmp_tsk->list);
         }
     }

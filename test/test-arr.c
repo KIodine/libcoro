@@ -28,7 +28,8 @@ coro_t *coro_arr[N_CORO], *main_co;
 int main(void){
     coro_stack_t *sstack;
 
-    sstack = coro_stack_new(0, 1);
+    coro_thread_env_save();
+    sstack = coro_stack_new_guarded(0);
     main_co = coro_new_main();
 
     printf("running %d coroutines\n", N_CORO);

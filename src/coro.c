@@ -38,14 +38,14 @@ static void default_ret_warn(void){
 
 void coro_ret_warn(void)
 {
-    /* FIXME: decide how to handle use of raw return in coroutine. */
-    printf("Current coroutine: %p\n", coro_tls_co);
+    /*  DO NOT USE STACK HERE, SP and BP may touch protected page, the SP is
+        right above coroutine stack by sizeof(void*) and BP having invalid
+        value (probably NULL). */
     if (coro_tls_ret_warn != NULL){
         coro_tls_ret_warn();
     } else {
         default_ret_warn();
     }
-    /* call `coro_tls_ret_warn` or `default_ret_warn` */
     return;
 }
 
@@ -170,6 +170,7 @@ void coro_reset(coro_t *co)
     memset(co->reg, 0, sizeof(co->reg));
     co->reg[REG_IDX_IP] = (void*)co->func;
     co->reg[REG_IDX_SP] = co->stack->ret_addr_ptr;
+    co->reg[REG_IDX_FPMX] = coro_tls_fpmx;
     co->is_ended = 0;
     co->mem.valid_sz = 0;
 
@@ -253,6 +254,11 @@ do_switch:
     
     /*  calculate max stack usage here, so we can record the stack usage of
         a one-time coroutine. */
+    /*  NOTE: It is fine we use SP here if it is "return" using `coro_return`(
+        which is considered a call by compiler), but `stack_use` being calcula-
+        -ted below will overflow if we do allow returning within stack protector
+        with something like `longjmp` or (presumed)`coro_recover`. */
+    // Do not calculate if returned from a coroutine triggers stack protector.
     stack_use = sstack->ret_addr_ptr - co->reg[REG_IDX_SP];
     if (stack_use > sstack->stat.max_stack_usage){
         sstack->stat.max_stack_usage = stack_use;

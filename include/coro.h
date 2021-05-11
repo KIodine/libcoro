@@ -14,7 +14,7 @@ enum {
     REG_IDX_SP = 1,
     REG_IDX_BP = 2,
     REG_IDX_IP = 3,
-    REG_IDX_FPMX = 8,
+    REG_IDX_FPMX = 8,   // lower half: fpu, higher half: mxcsr.
 };
 
 
@@ -58,20 +58,32 @@ struct coro_s {
     void *arg;
     coro_t *from_co;
     /* --- flags --- */
-    int is_ended;
+    int is_ended;   // bit-flag instead?
 };
 
 
 /* The variable for thread local currently running coroutine. */
 /* TODO:
 - Custom check macros.
-- Wrap access to global variable into `coro_*` function.
+- V)Wrap access to global variable into `coro_*` function.
 - Rearrange struct layout.
-- Add shortcuts for certain operations, such as allocating a main coro.
-- (PROPOSAL)Add statistic fields to structs.
+- V)Add shortcuts for certain operations, such as allocating a main coro.
+- V)(PROPOSAL)Add statistic fields to structs.
 - Add more checks, assertions.
 - Test abort mechanism and test stack overflow.
 - (STUDY) The possibility of return from triggered raw-return protection.
+    Just call `coro_return`? this involves stack unwinding on function
+    epilogue. Or using a thread-local `jmpbuf` for `setjmp/longjmp`?
+    Prologue: push rbp; mov rbp, rsp; sub rsp, <stack-sz>;
+    Epilogue: mov rsp, rbp; pop rbp; ret;
+    --> preserves base of stack frame, set new base, "alloc" stack space.
+        "dealloc" stack space, recover stack base, return.
+    After triggered the protection, SP is a `sizeof(void*)` above stack and BP
+    being 0 or other value depends on the initial value set in `coro_new`;
+    programmers MUST avoid the usage of stack(local variable storage) inside
+    protection routine. The only way of breaking out is calling (presumed)
+    `coro_recover`(it just loads the enviroment of main coro without preserve
+    the current env) or utilizing `setjmp/longjmp`.
 */
 
 extern __thread coro_t *coro_tls_co;
@@ -102,6 +114,7 @@ void coro_resume(coro_t *co);
 void coro_reset(coro_t *co);
 
 /* ensure pointer is not NULL? */
+/* TODO: forbid yield to same shared stack. */
 #define coro_yield() do { \
     coro_switch(coro_tls_co, coro_tls_co->from_co);\
 } while (0)
