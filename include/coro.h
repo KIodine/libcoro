@@ -65,25 +65,15 @@ struct coro_s {
 /* The variable for thread local currently running coroutine. */
 /* TODO:
 - Custom check macros.
-- V)Wrap access to global variable into `coro_*` function.
-- Rearrange struct layout.
-- V)Add shortcuts for certain operations, such as allocating a main coro.
-- V)(PROPOSAL)Add statistic fields to structs.
 - Add more checks, assertions.
 - Test abort mechanism and test stack overflow.
 - (STUDY) The possibility of return from triggered raw-return protection.
-    Just call `coro_return`? this involves stack unwinding on function
-    epilogue. Or using a thread-local `jmpbuf` for `setjmp/longjmp`?
-    Prologue: push rbp; mov rbp, rsp; sub rsp, <stack-sz>;
-    Epilogue: mov rsp, rbp; pop rbp; ret;
-    --> preserves base of stack frame, set new base, "alloc" stack space.
-        "dealloc" stack space, recover stack base, return.
     After triggered the protection, SP is a `sizeof(void*)` above stack and BP
     being 0 or other value depends on the initial value set in `coro_new`;
     programmers MUST avoid the usage of stack(local variable storage) inside
     protection routine. The only way of breaking out is calling (presumed)
     `coro_recover`(it just loads the enviroment of main coro without preserve
-    the current env) or utilizing `setjmp/longjmp`.
+    the current env) and mark coroutine ended/exception, or utilizing `setjmp/longjmp`.
 */
 
 extern __thread coro_t *coro_tls_co;
@@ -91,10 +81,7 @@ extern __thread coro_fp_t coro_tls_ret_warn;
 
 void coro_thread_init(coro_fp_t ret_cb);
 #define coro_thread_env_save() coro_thread_init(NULL)
-//#define coro_set_ret_warn(fp) ((void)0, coro_tls_ret_warn = (fp))
 
-//void coro_ret_warn(void); /* may call default warning or `coro_tls_ret_warn`. */
-extern void coro_stack_ret(void) __asm__("coro_stack_ret");
 
 coro_stack_t *coro_stack_new(size_t sz_hint, int enable_guard_page);
 void coro_stack_free(coro_stack_t *stack);
@@ -125,7 +112,7 @@ void coro_reset(coro_t *co);
     coro_yield();\
 } while (0)
 
-/* How to prevent this being a left value? */
+/* prevent this being a left value? */
 #define coro_get_co() ((void)0, (coro_tls_co))
 #define coro_get_arg() ((void)0, (coro_tls_co->arg))
 

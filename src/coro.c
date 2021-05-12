@@ -9,14 +9,13 @@
 #include "coro.h"
 
 
-//static void default_ret_warn(void);
-
 __thread coro_t *coro_tls_co = NULL;
 __thread coro_fp_t coro_tls_ret_warn = NULL;
 __thread void *coro_tls_fpmx = NULL;
 _Static_assert(sizeof(coro_tls_fpmx) == 8UL, "Assert size of `coro_tls_fpmx` is 8 failed\n");
 
 extern void coro_save_fpmx(void**) __asm__("coro_save_fpmx");
+extern void coro_stack_ret(void) __asm__("coro_stack_ret");
 
 
 void coro_thread_init(coro_fp_t ret_cb){
