@@ -32,14 +32,6 @@ ASMOBJ := $(addprefix $(OBJDIR)/,$(ASMOBJ))
 
 LIBOBJS := $(SRCOBJ) $(ASMOBJ)
 
-TESTDIR := test
-TESTS := test-basic.c
-TESTDST := $(addprefix $(TESTDIR)/,$(TESTS))
-TESTOBJ := $(patsubst %.c,%.o,$(TESTS))
-TESTOBJ := $(addprefix $(OBJDIR)/,$(TESTOBJ))
-
-TESTBIN := test-coro
-
 
 .PHONY: static shared clean depends testbin runtest
 
@@ -63,33 +55,18 @@ $(LIBSHARED): $(LIBOBJS)
 shared: $(LIBSHARED)
 
 # --- test ---
-$(TESTOBJ): $(OBJDIR)/%.o: $(TESTDIR)/%.c | $(OBJDIR)
-	$(CC) -c -o $@ $(CFLAGS) $^
-$(BINDIR)/$(TESTBIN): $(TESTOBJ) $(LIBSTATIC)
-	$(CC) -o $@ $(CFLAGS) $^
-testbin: $(BINDIR)/$(TESTBIN)
-
-runtest: $(BINDIR)/$(TESTBIN)
-	./$(BINDIR)/$(TESTBIN)
-
-# TODO: Study how to build multiple tests.
 _TESTBIN := test-basic test-arr test-sched
 _TESTBIN := $(addprefix ./bin/,$(_TESTBIN))
 $(_TESTBIN): $(BINDIR)/%: test/%.c $(LIBSTATIC)
 	$(CC) -o $@ $(CFLAGS) $^
 buildtests: $(_TESTBIN)
 
-#TESTSRC := test-basic.c test-arr.c test-sched.c
-#$(BINDIR)/test-basic: $(LIBSTATIC)
-#	$(CC) -o $@ $(CFLAGS) test/test-basic.c $(LIBSTATIC)
-#$(BINDIR)/test-arr: $(LIBSTATIC)
-#	$(CC) -o $@ $(CFLAGS) test/test-arr.c $(LIBSTATIC)
-#$(BINDIR)/test-sched: $(LIBSTATIC)
-#	$(CC) -o $@ $(CFLAGS) test/test-sched.c $(LIBSTATIC)
-
 # --- generic tools ---
 clean:
-	rm -f $(LIBOBJS) $(TESTOBJ) $(TESTBIN) $(_TESTBIN)
+	rm -f $(LIBOBJS) $(_TESTBIN)
+
+clean_all: clean
+	rm -f $(LIBSTATIC) $(LIBSHARED)
 
 # --- DO NOT MODIFY MANUALLY! ---
 # > To update, use make command below:
